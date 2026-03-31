@@ -1,0 +1,37 @@
+[
+  {
+    "status": "failed",
+    "exp": "RGB_Only_Restormer",
+    "error": "Traceback (most recent call last):\n  File \"/home/zcl/addfuse1/training/train_rgb_single.py\", line 89, in <module>\n    main()\n  File \"/home/zcl/addfuse1/training/train_rgb_single.py\", line 60, in main\n    train_loader, val_loader = build_dataloaders(\n  File \"/home/zcl/addfuse1/datasets/dataset_drought.py\", line 541, in build_dataloaders\n    from advanced_augmentation import create_augmented_dataset\nModuleNotFoundError: No module named 'advanced_augmentation'\n"
+  },
+  {
+    "status": "failed",
+    "exp": "TIR_Only_Restormer",
+    "error": "Traceback (most recent call last):\n  File \"/home/zcl/addfuse1/training/train_tir_single.py\", line 89, in <module>\n    main()\n  File \"/home/zcl/addfuse1/training/train_tir_single.py\", line 60, in main\n    train_loader, val_loader = build_dataloaders(\n  File \"/home/zcl/addfuse1/datasets/dataset_drought.py\", line 541, in build_dataloaders\n    from advanced_augmentation import create_augmented_dataset\nModuleNotFoundError: No module named 'advanced_augmentation'\n"
+  },
+  {
+    "status": "failed",
+    "exp": "MS_Only_Restormer",
+    "error": "Traceback (most recent call last):\n  File \"/home/zcl/addfuse1/training/train_ms_single.py\", line 107, in <module>\n    main()\n  File \"/home/zcl/addfuse1/training/train_ms_single.py\", line 78, in main\n    train_loader, val_loader = build_dataloaders(\n  File \"/home/zcl/addfuse1/datasets/dataset_drought.py\", line 541, in build_dataloaders\n    from advanced_augmentation import create_augmented_dataset\nModuleNotFoundError: No module named 'advanced_augmentation'\n"
+  },
+  {
+    "status": "failed",
+    "exp": "RGB_TIR_Restormer",
+    "error": "Traceback (most recent call last):\n  File \"/home/zcl/addfuse1/training/train_rgb_tir_multimodal.py\", line 47, in <module>\n    train_loader, val_loader = build_dataloaders(\n  File \"/home/zcl/addfuse1/datasets/dataset_drought.py\", line 541, in build_dataloaders\n    from advanced_augmentation import create_augmented_dataset\nModuleNotFoundError: No module named 'advanced_augmentation'\n"
+  },
+  {
+    "status": "failed",
+    "exp": "RGB_MS_Restormer",
+    "error": "Traceback (most recent call last):\n  File \"/home/zcl/addfuse1/training/train_rgb_ms_multimodal.py\", line 47, in <module>\n    train_loader, val_loader = build_dataloaders(\n  File \"/home/zcl/addfuse1/datasets/dataset_drought.py\", line 541, in build_dataloaders\n    from advanced_augmentation import create_augmented_dataset\nModuleNotFoundError: No module named 'advanced_augmentation'\n"
+  },
+  {
+    "status": "failed",
+    "exp": "TIR_MS_Restormer",
+    "error": "Traceback (most recent call last):\n  File \"/home/zcl/addfuse1/training/train_tir_ms_multimodal.py\", line 47, in <module>\n    train_loader, val_loader = build_dataloaders(\n  File \"/home/zcl/addfuse1/datasets/dataset_drought.py\", line 541, in build_dataloaders\n    from advanced_augmentation import create_augmented_dataset\nModuleNotFoundError: No module named 'advanced_augmentation'\n"
+  },
+  {
+    "status": "failed",
+    "exp": "RGB_TIR_MS_Restormer",
+    "error": "Traceback (most recent call last):\n  File \"/home/zcl/addfuse1/training/train_drought_optimized_v4.py\", line 22, in <module>\n    from net_drought import DroughtClassifier\nModuleNotFoundError: No module named 'net_drought'\n"
+  }
+]

@@ -1,0 +1,145 @@
+
+======================================================================
+干旱分级单分支消融实验
+======================================================================
+开始时间: 2026-03-24 20:31:53
+
+[1/7] 运行实验...
+
+======================================================================
+实验: RGB_Only_Restormer
+描述: 仅 RGB 分支（Restormer）
+脚本: training/train_rgb_single.py
+======================================================================
+执行命令: python training/train_rgb_single.py --csv_path 2025label_classic5.csv --data_root dataset/ --epochs 40 --batch_size 4 --save_dir ./models_RGB_Only_Restormer
+❌ 实验 RGB_Only_Restormer 失败
+错误: Traceback (most recent call last):
+  File "/home/zcl/addfuse1/training/train_rgb_single.py", line 89, in <module>
+    main()
+  File "/home/zcl/addfuse1/training/train_rgb_single.py", line 60, in main
+    train_loader, val_loader = build_dataloaders(
+  File "/home/zcl/addfuse1/datasets/dataset_drought.py", line 541, in build_dataloaders
+    from advanced_augmentation import create_augmented_dataset
+ModuleNotFoundError: No module named 'advanced_augmentation'
+
+
+[2/7] 运行实验...
+
+======================================================================
+实验: TIR_Only_Restormer
+描述: 仅 TIR 分支（Restormer）
+脚本: training/train_tir_single.py
+======================================================================
+执行命令: python training/train_tir_single.py --csv_path 2025label_classic5.csv --data_root dataset/ --epochs 40 --batch_size 4 --save_dir ./models_TIR_Only_Restormer
+❌ 实验 TIR_Only_Restormer 失败
+错误: Traceback (most recent call last):
+  File "/home/zcl/addfuse1/training/train_tir_single.py", line 89, in <module>
+    main()
+  File "/home/zcl/addfuse1/training/train_tir_single.py", line 60, in main
+    train_loader, val_loader = build_dataloaders(
+  File "/home/zcl/addfuse1/datasets/dataset_drought.py", line 541, in build_dataloaders
+    from advanced_augmentation import create_augmented_dataset
+ModuleNotFoundError: No module named 'advanced_augmentation'
+
+
+[3/7] 运行实验...
+
+======================================================================
+实验: MS_Only_Restormer
+描述: 仅 MS 分支（Restormer）
+脚本: training/train_ms_single.py
+======================================================================
+执行命令: python training/train_ms_single.py --csv_path 2025label_classic5.csv --data_root dataset/ --epochs 40 --batch_size 4 --save_dir ./models_MS_Only_Restormer
+❌ 实验 MS_Only_Restormer 失败
+错误: Traceback (most recent call last):
+  File "/home/zcl/addfuse1/training/train_ms_single.py", line 107, in <module>
+    main()
+  File "/home/zcl/addfuse1/training/train_ms_single.py", line 78, in main
+    train_loader, val_loader = build_dataloaders(
+  File "/home/zcl/addfuse1/datasets/dataset_drought.py", line 541, in build_dataloaders
+    from advanced_augmentation import create_augmented_dataset
+ModuleNotFoundError: No module named 'advanced_augmentation'
+
+
+[4/7] 运行实验...
+
+======================================================================
+实验: RGB_TIR_Restormer
+描述: RGB + TIR（不含 MS）
+脚本: training/train_rgb_tir_multimodal.py
+======================================================================
+执行命令: python training/train_rgb_tir_multimodal.py --csv_path 2025label_classic5.csv --data_root dataset/ --epochs 40 --batch_size 4 --save_dir ./models_RGB_TIR_Restormer
+❌ 实验 RGB_TIR_Restormer 失败
+错误: Traceback (most recent call last):
+  File "/home/zcl/addfuse1/training/train_rgb_tir_multimodal.py", line 47, in <module>
+    train_loader, val_loader = build_dataloaders(
+  File "/home/zcl/addfuse1/datasets/dataset_drought.py", line 541, in build_dataloaders
+    from advanced_augmentation import create_augmented_dataset
+ModuleNotFoundError: No module named 'advanced_augmentation'
+
+
+[5/7] 运行实验...
+
+======================================================================
+实验: RGB_MS_Restormer
+描述: RGB + MS（不含 TIR）
+脚本: training/train_rgb_ms_multimodal.py
+======================================================================
+执行命令: python training/train_rgb_ms_multimodal.py --csv_path 2025label_classic5.csv --data_root dataset/ --epochs 40 --batch_size 4 --save_dir ./models_RGB_MS_Restormer
+❌ 实验 RGB_MS_Restormer 失败
+错误: Traceback (most recent call last):
+  File "/home/zcl/addfuse1/training/train_rgb_ms_multimodal.py", line 47, in <module>
+    train_loader, val_loader = build_dataloaders(
+  File "/home/zcl/addfuse1/datasets/dataset_drought.py", line 541, in build_dataloaders
+    from advanced_augmentation import create_augmented_dataset
+ModuleNotFoundError: No module named 'advanced_augmentation'
+
+
+[6/7] 运行实验...
+
+======================================================================
+实验: TIR_MS_Restormer
+描述: TIR + MS（不含 RGB）
+脚本: training/train_tir_ms_multimodal.py
+======================================================================
+执行命令: python training/train_tir_ms_multimodal.py --csv_path 2025label_classic5.csv --data_root dataset/ --epochs 40 --batch_size 4 --save_dir ./models_TIR_MS_Restormer
+❌ 实验 TIR_MS_Restormer 失败
+错误: Traceback (most recent call last):
+  File "/home/zcl/addfuse1/training/train_tir_ms_multimodal.py", line 47, in <module>
+    train_loader, val_loader = build_dataloaders(
+  File "/home/zcl/addfuse1/datasets/dataset_drought.py", line 541, in build_dataloaders
+    from advanced_augmentation import create_augmented_dataset
+ModuleNotFoundError: No module named 'advanced_augmentation'
+
+
+[7/7] 运行实验...
+
+======================================================================
+实验: RGB_TIR_MS_Restormer
+描述: RGB + TIR + MS（完整）
+脚本: training/train_drought_optimized_v4.py
+======================================================================
+执行命令: python training/train_drought_optimized_v4.py --csv_path 2025label_classic5.csv --data_root dataset/ --epochs 40 --batch_size 4 --save_dir ./models_RGB_TIR_MS_Restormer
+❌ 实验 RGB_TIR_MS_Restormer 失败
+错误: Traceback (most recent call last):
+  File "/home/zcl/addfuse1/training/train_drought_optimized_v4.py", line 22, in <module>
+    from net_drought import DroughtClassifier
+ModuleNotFoundError: No module named 'net_drought'
+
+
+======================================================================
+实验汇总
+======================================================================
+成功: 0/7
+完成时间: 2026-03-24 20:32:05
+
+各实验状态:
+  ❌ RGB_Only_Restormer: failed
+  ❌ TIR_Only_Restormer: failed
+  ❌ MS_Only_Restormer: failed
+  ❌ RGB_TIR_Restormer: failed
+  ❌ RGB_MS_Restormer: failed
+  ❌ TIR_MS_Restormer: failed
+  ❌ RGB_TIR_MS_Restormer: failed
+
+✅ 结果已保存到 ablation_study_results.json

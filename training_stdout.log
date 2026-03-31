@@ -1,0 +1,10 @@
+============================================================
+TIR Single-Modal Drought Classification Training
+============================================================
+Device: cuda
+CSV:    E:\myproject1\all\addfuse\2025label_classic5.csv
+Data:   E:\myproject1\all\addfuse\dataset\
+Epochs: 10, Batch: 4, LR: 0.0001
+Augment: False, augmentation_factor: 0
+Balanced split: True
+============================================================

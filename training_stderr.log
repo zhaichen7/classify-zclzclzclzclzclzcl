@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "E:\myproject1\all\addfuse\training\train_drought_tir_only.py", line 187, in <module>
+    main()
+  File "E:\myproject1\all\addfuse\training\train_drought_tir_only.py", line 127, in main
+    train_loader, val_loader = build_dataloaders(
+  File "E:\myproject1\all\addfuse\datasets\dataset_drought.py", line 527, in build_dataloaders
+    train_ds, val_ds = build_datasets(
+  File "E:\myproject1\all\addfuse\datasets\dataset_drought.py", line 483, in build_datasets
+    return build_datasets_balanced(csv_path, data_root, test_size, random_state,
+  File "E:\myproject1\all\addfuse\datasets\dataset_drought.py", line 435, in build_datasets_balanced
+    print("\u2705 平衡分割完成:")
+UnicodeEncodeError: 'gbk' codec can't encode character '\u2705' in position 0: illegal multibyte sequence
