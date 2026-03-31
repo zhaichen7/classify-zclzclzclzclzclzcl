@@ -1,0 +1,371 @@
+"""
+train_kfold_final_v6.py
+K折交叉验证 + 三模态融合
+RGB (3) + TIR (3) + VI (3: NDVI, GNDVI, SAVI)
+修复文件删除问题 + 优化模型超参数
+"""
+import os
+import sys
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
+from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import accuracy_score, f1_score, classification_report
+import numpy as np
+import pandas as pd
+import tempfile
+
+sys.path.append('.')
+from datasets.dataset_drought import DroughtDataset
+
+# ============================================================================
+# 数据包装
+# ============================================================================
+
+class VegetationIndexExtractor(Dataset):
+    def __init__(self, dataset):
+        self.dataset = dataset
+    
+    def __len__(self):
+        return len(self.dataset)
+    
+    def __getitem__(self, idx):
+        rgb, tir, ms, label = self.dataset[idx]
+        vi = ms[5:8, :, :]  # NDVI, GNDVI, SAVI
+        return rgb, tir, vi, label
+
+# ============================================================================
+# 三模态融合模型 - 更深更强
+# ============================================================================
+
+class TrimodalFusionNet(nn.Module):
+    def __init__(self, num_classes=5):
+        super().__init__()
+        
+        # RGB 编码器
+        self.rgb_encoder = nn.Sequential(
+            nn.Conv2d(3, 64, 7, stride=2, padding=3),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),
+            nn.Conv2d(64, 128, 3, stride=2, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, 256, 3, stride=2, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 512, 3, stride=1, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.AdaptiveAvgPool2d(1)
+        )
+        
+        # TIR 编码器
+        self.tir_encoder = nn.Sequential(
+            nn.Conv2d(3, 64, 7, stride=2, padding=3),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),
+            nn.Conv2d(64, 128, 3, stride=2, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, 256, 3, stride=2, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 512, 3, stride=1, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.AdaptiveAvgPool2d(1)
+        )
+        
+        # VI 编码器
+        self.vi_encoder = nn.Sequential(
+            nn.Conv2d(3, 64, 7, stride=2, padding=3),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),
+            nn.Conv2d(64, 128, 3, stride=2, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, 256, 3, stride=2, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 512, 3, stride=1, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.AdaptiveAvgPool2d(1)
+        )
+        
+        # 融合权重
+        self.fusion_weights = nn.Sequential(
+            nn.Linear(1536, 256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.3),
+            nn.Linear(256, 3),
+            nn.Softmax(dim=1)
+        )
+        
+        # 分类头
+        self.classifier = nn.Sequential(
+            nn.Linear(512, 256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.5),
+            nn.Linear(256, 128),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.4),
+            nn.Linear(128, num_classes)
+        )
+    
+    def forward(self, rgb, tir, vi):
+        rgb_feat = self.rgb_encoder(rgb).view(rgb.size(0), -1)
+        tir_feat = self.tir_encoder(tir).view(tir.size(0), -1)
+        vi_feat = self.vi_encoder(vi).view(vi.size(0), -1)
+        
+        concat = torch.cat([rgb_feat, tir_feat, vi_feat], dim=1)
+        weights = self.fusion_weights(concat)
+        
+        fused = (weights[:, 0:1] * rgb_feat + 
+                 weights[:, 1:2] * tir_feat + 
+                 weights[:, 2:3] * vi_feat)
+        
+        logits = self.classifier(fused)
+        return logits, weights
+
+# ============================================================================
+# Focal Loss
+# ============================================================================
+
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=None, gamma=2.0):
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+
+    def forward(self, inputs, targets):
+        ce_loss = nn.functional.cross_entropy(inputs, targets, reduction='none', weight=self.alpha)
+        p = torch.exp(-ce_loss)
+        focal_loss = (1 - p) ** self.gamma * ce_loss
+        return focal_loss.mean()
+
+# ============================================================================
+# 训练
+# ============================================================================
+
+def train_epoch(model, train_loader, criterion, optimizer, device):
+    model.train()
+    loss_sum = 0
+    correct = 0
+    total = 0
+    
+    for rgb, tir, vi, labels in train_loader:
+        rgb, tir, vi, labels = rgb.to(device), tir.to(device), vi.to(device), labels.to(device)
+        
+        optimizer.zero_grad()
+        logits, _ = model(rgb, tir, vi)
+        loss = criterion(logits, labels)
+        
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        optimizer.step()
+        
+        loss_sum += loss.item() * labels.size(0)
+        correct += (logits.argmax(dim=1) == labels).sum().item()
+        total += labels.size(0)
+    
+    return loss_sum / total, correct / total
+
+@torch.no_grad()
+def evaluate(model, val_loader, device):
+    model.eval()
+    preds_all = []
+    targets_all = []
+    
+    for rgb, tir, vi, labels in val_loader:
+        rgb, tir, vi = rgb.to(device), tir.to(device), vi.to(device)
+        
+        logits, _ = model(rgb, tir, vi)
+        preds_all.extend(logits.argmax(dim=1).cpu().numpy())
+        targets_all.extend(labels.numpy())
+    
+    acc = accuracy_score(targets_all, preds_all)
+    f1 = f1_score(targets_all, preds_all, average='weighted', zero_division=0)
+    
+    return acc, f1, np.array(preds_all), np.array(targets_all)
+
+# ============================================================================
+# 主函数
+# ============================================================================
+
+def main():
+    csv_path = "2025label_classic5.csv"
+    data_root = "dataset/"
+    epochs = 200
+    batch_size = 16
+    lr = 5e-4
+    num_folds = 5
+    
+    os.makedirs("./models_trimodal_kfold", exist_ok=True)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    print("="*80)
+    print(f"🔗 三模态融合 K折交叉验证 (K={num_folds})")
+    print("="*80)
+    print("🌐 数据维度:")
+    print("   RGB: 3通道")
+    print("   TIR: 3通道")
+    print("   VI:  3通道 (NDVI, GNDVI, SAVI)")
+    print("="*80)
+    
+    # 加载数据
+    print("\n📊 加载数据...")
+    df = pd.read_csv(csv_path)
+    labels = df['label'].values
+    
+    print(f"✅ 数据集: {len(df)} 个样本")
+    print(f"   标签分布: {np.bincount(labels)}")
+    
+    # K折
+    print(f"\n🔄 K折交叉验证...\n")
+    skf = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=42)
+    
+    fold_results = []
+    all_ensemble_preds = []
+    all_ensemble_targets = np.array([], dtype=int)
+    
+    for fold, (train_idx, val_idx) in enumerate(skf.split(np.zeros(len(labels)), labels)):
+        print(f"\n{'='*80}")
+        print(f"Fold {fold+1}/{num_folds}")
+        print(f"  训练: {len(train_idx)}, 验证: {len(val_idx)}")
+        print(f"{'='*80}")
+        
+        # 使用临时目录
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # 生成子集 CSV
+            train_df = df.iloc[train_idx]
+            val_df = df.iloc[val_idx]
+            
+            train_csv = os.path.join(tmpdir, f"train_fold{fold}.csv")
+            val_csv = os.path.join(tmpdir, f"val_fold{fold}.csv")
+            
+            train_df.to_csv(train_csv, index=False)
+            val_df.to_csv(val_csv, index=False)
+            
+            # 创建数据集
+            print("  📂 加载数据集...")
+            train_raw = DroughtDataset(train_csv, data_root=data_root, modalities=['rgb', 'tir', 'ms'], ids=list(train_df['id'].values))
+            val_raw = DroughtDataset(val_csv, data_root=data_root, modalities=['rgb', 'tir', 'ms'], ids=list(val_df['id'].values))
+            
+            train_ds = VegetationIndexExtractor(train_raw)
+            val_ds = VegetationIndexExtractor(val_raw)
+            
+            train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=0)
+            val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=0)
+            
+            print(f"  ✅ 数据加载完成 (批次: {len(train_loader)}/{len(val_loader)})")
+            
+            # 创建模型
+            model = TrimodalFusionNet(num_classes=5)
+            model.to(device)
+            
+            # 计算权重
+            from collections import Counter
+            train_labels = train_df['label'].values
+            counts = Counter(train_labels)
+            total = len(train_labels)
+            weights = torch.tensor(
+                [total / (5 * counts.get(i, 1)) for i in range(5)],
+                dtype=torch.float, device=device
+            )
+            weights = weights / weights.sum() * 5
+            
+            # 损失函数
+            focal_loss = FocalLoss(alpha=weights, gamma=2.0)
+            ce_loss = nn.CrossEntropyLoss(label_smoothing=0.1, weight=weights)
+            
+            def criterion(outputs, targets):
+                return 0.6 * focal_loss(outputs, targets) + 0.4 * ce_loss(outputs, targets)
+            
+            # 优化器
+            optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+            scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
+            
+            # 训练
+            best_f1 = 0
+            patience = 25
+            patience_cnt = 0
+            best_preds = None
+            best_targets = None
+            best_acc = 0
+            
+            print(f"\n  🚀 开始训练...\n")
+            
+            for epoch in range(1, epochs + 1):
+                train_loss, train_acc = train_epoch(model, train_loader, criterion, optimizer, device)
+                val_acc, val_f1, val_preds, val_targets = evaluate(model, val_loader, device)
+                scheduler.step()
+                
+                if epoch % 20 == 0 or epoch == 1:
+                    print(f"  Epoch {epoch:3d}: train_loss={train_loss:.4f}, train_acc={train_acc*100:.1f}%, val_acc={val_acc*100:.1f}%, val_f1={val_f1*100:.1f}%")
+                
+                if val_f1 > best_f1:
+                    best_f1 = val_f1
+                    best_acc = val_acc
+                    patience_cnt = 0
+                    best_preds = val_preds
+                    best_targets = val_targets
+                    
+                    torch.save(model.state_dict(), f"./models_trimodal_kfold/fold{fold+1}_best.pth")
+                else:
+                    patience_cnt += 1
+                    if patience_cnt >= patience:
+                        print(f"  ⚠️  早停 (Epoch {epoch})")
+                        break
+            
+            fold_results.append({'fold': fold+1, 'acc': best_acc, 'f1': best_f1})
+            all_ensemble_preds.extend(best_preds)
+            all_ensemble_targets = np.concatenate([all_ensemble_targets, best_targets])
+            
+            print(f"\n  ✅ Fold {fold+1}: Acc={best_acc*100:.2f}%, F1={best_f1*100:.2f}%")
+    
+    # 结果汇总
+    print(f"\n{'='*80}")
+    print("🎯 K折交叉验证结果")
+    print(f"{'='*80}")
+    
+    accs = [r['acc'] for r in fold_results]
+    f1s = [r['f1'] for r in fold_results]
+    
+    print(f"\n📊 单模型平均性能:")
+    print(f"  准确率: {np.mean(accs)*100:.2f}% ± {np.std(accs)*100:.2f}%")
+    print(f"  F1分数: {np.mean(f1s)*100:.2f}% ± {np.std(f1s)*100:.2f}%")
+    
+    print(f"\n📋 各折结果:")
+    for r in fold_results:
+        print(f"  Fold {r['fold']}: Acc={r['acc']*100:.2f}%, F1={r['f1']*100:.2f}%")
+    
+    # 集成投票
+    all_ensemble_preds = np.array(all_ensemble_preds)
+    ensemble_acc = accuracy_score(all_ensemble_targets, all_ensemble_preds)
+    ensemble_f1 = f1_score(all_ensemble_targets, all_ensemble_preds, average='weighted', zero_division=0)
+    
+    print(f"\n🔗 集成模型性能:")
+    print(f"  准确率: {ensemble_acc*100:.2f}%")
+    print(f"  F1分数: {ensemble_f1*100:.2f}%")
+    
+    print(f"\n📈 相对第1阶段 (Acc=55.00%, F1=54.43%) 的改进:")
+    print(f"  单模型准确率: {(np.mean(accs)-0.55)*100:+.2f}%")
+    print(f"  单模型F1分数: {(np.mean(f1s)-0.5443)*100:+.2f}%")
+    print(f"  集成准确率: {(ensemble_acc-0.55)*100:+.2f}%")
+    print(f"  集成F1分数: {(ensemble_f1-0.5443)*100:+.2f}%")
+    
+    print(f"\n📋 集成模型分类详细报告:")
+    print(classification_report(all_ensemble_targets, all_ensemble_preds,
+                               target_names=[f'Level {i}' for i in range(5)],
+                               digits=4))
+    
+    print(f"\n✅ 完成！所有模型已保存到 ./models_trimodal_kfold/")
+    print("="*80)
+
+if __name__ == '__main__':
+    main()
